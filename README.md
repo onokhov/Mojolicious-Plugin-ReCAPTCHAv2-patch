@@ -110,10 +110,32 @@ Condition subroutine takes Mojolicious::Controller object as argument and
 must return true or false. True means that current route requres captcha
 protection. False means no protection required.
 
+- `disabled`
+
+```
+  reCAPTCHAv2 => {
+    ...
+    disabled => 1,
+    ...
+  },
+```
+  
+Set it true if you want to completely skip captcha validation. This can be useful
+for autotests. Environment variable C<CAPTCHA_DISABLED> has the same effect.
+
 - `response_name`
 
 Name of parameter with captcha response. Defines what parameter to pass
 Google for validation. Default is C<captcha>.
+
+- `header`
+
+```
+  header => 'X-Captcha',
+```
+  
+If C<header> is set, than captcha response value expected in this header
+instead of request parameter
 
 - `timeout`
 
