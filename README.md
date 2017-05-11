@@ -61,7 +61,7 @@ options into application config file and the plugin takes them from the file.
 
 # OPTIONS
 
-Options can be set as parameters on plugin registration or in C<reCAPTCHAv2>
+Options can be set as parameters on plugin registration or in `reCAPTCHAv2`
 section of app config. Helper specific options can be passed as parameters to helper.
 Options from app config have higher precedence than registration parameters and lower
 precedence than hepler parameters.
@@ -121,12 +121,12 @@ protection. False means no protection required.
 ```
   
 Set it true if you want to completely skip captcha validation. This can be useful
-for autotests. Environment variable C<CAPTCHA_DISABLED> has the same effect.
+for autotests. Environment variable `CAPTCHA_DISABLED` has the same effect.
 
 - `response_name`
 
 Name of parameter with captcha response. Defines what parameter to pass
-Google for validation. Default is C<captcha>.
+Google for validation. Default is `captcha`.
 
 - `header`
 
@@ -134,12 +134,12 @@ Google for validation. Default is C<captcha>.
   header => 'X-Captcha',
 ```
   
-If C<header> is set, than captcha response value expected in this header
+If `header` is set, than captcha response value expected in this header
 instead of request parameter
 
 - `timeout`
 
-Timeout for validation process in seconds. Default is C<5>.
+Timeout for validation process in seconds. Default is `5`.
 
 - `on_error`
 
@@ -154,8 +154,8 @@ and hashref of validation response as arguments. Default value is like this:
   }
 ```
 
-The message is C<"captcha invalid"> if captcha response is invalid and
-C<"captcha validation error"> if validation is failed for other reasons.
+The message is `"captcha invalid"` if captcha response is invalid and
+`"captcha validation error"` if validation is failed for other reasons.
 If [response_name] option is set it is used instead of 'capthca'.
 
 - `on_success`
@@ -184,7 +184,7 @@ registration call have lowes precedence.
 See [https://developers.google.com/recaptcha/docs/display] for full
 options description.
 
-### OPTIONS FOR C<recaptcha_script>
+### OPTIONS FOR `recaptcha_script`
 
 
 - `onload`
@@ -202,7 +202,7 @@ True or False. Default `1`
 True or False. Default `1`
 
 
-### OPTIONS FOR C<recaptcha_div>
+### OPTIONS FOR `recaptcha_div`
 
 
 - `theme`
