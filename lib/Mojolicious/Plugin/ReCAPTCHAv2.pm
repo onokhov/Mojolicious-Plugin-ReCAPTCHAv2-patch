@@ -9,45 +9,50 @@ use Hash::Merge::Simple 'clone_merge';
 sub register {
     my( $plugin, $app, $conf ) =  @_;
 
-    $plugin->{config} = clone_merge { response_name => 'captcha', timeout => 5 },
+    $plugin->{config} = clone_merge { response_name => 'captcha', header => '', timeout => 5 },
                                     $conf // {},
                                     $app->config( 'reCAPTCHAv2' ) // {};
 
     $plugin->{config}{on_success}
         //= sub { delete $_[0]->req->{params}{ $plugin->{config}{response_name} } };
-    
+
     $plugin->{config}{on_error}
         //= sub { $_[0]->render( status => 400, json => { error => $_[1] } ) };
 
-    $plugin->{config}{$_} //= 1 for 'async', 'defer';    
+    $plugin->{config}{$_} //= 1 for 'async', 'defer';
 
-    die __PACKAGE__ . ": captcha condition is not defined."
+    $app->log->warn( __PACKAGE__ . ": captcha condition is not defined." )
         unless $plugin->{config}{condition};
-    
+
     unless ( 'CODE' eq ref $plugin->{config}{condition} ) {
         my $routes = $plugin->{config}{condition};
         $routes = [$routes] unless ref $routes;
-        
+
         die __PACKAGE__ . ": captcha condition is incorrect."
             unless 'ARRAY' eq ref $routes;
-        
-        $plugin->{config}{routes}{$_}++ for @$routes;
-        
+
+        $plugin->{config}{routes}{$_}++ for grep defined, @$routes;
+
         $plugin->{config}{condition}
             = sub { exists $plugin->{config}{routes}{ $_[0]->current_route } };
     }
-    
+
     $plugin->{config}{ua}
         = Mojo::UserAgent->new->request_timeout( $plugin->{config}{timeout} );
 
     die __PACKAGE__ . ": 'sitekey' is missing" unless $plugin->{config}{sitekey};
-    
+
     die __PACKAGE__ . ": 'secret' is missing"  unless $plugin->{config}{secret};
-    
+
     die __PACKAGE__ . ": $_ must be code ref."
         for grep 'CODE' ne ref($plugin->{config}{$_}), qw(on_success on_error);
 
-    $app->hook( around_action => sub { $plugin->check_captcha(@_) } );
+    if ( $plugin->{config}{disabled} or $ENV{CAPTCHA_DISABLED} ) {
+        $app->log->warn( __PACKAGE__ . ": captcha protection disabled in config." );
+    }
+    else {
+        $app->hook( around_action => sub { $plugin->check_captcha(@_) } );
+    }
 
     $app->helper( recaptcha_script => sub { $plugin->recaptcha_script(@_) } );
 
@@ -61,8 +66,15 @@ sub check_captcha {
     return $next->() unless $last;
     return $next->() unless $self->{config}{condition}->($c);
 
-    my $response = $c->param($self->{config}{response_name})
-        or return $self->{config}{on_error}->($c, "$self->{config}{response_name} required");
+    my $response = $self->{config}{header}
+                    ? $c->req->headers->header($self->{config}{header})
+                    : $c->param($self->{config}{response_name});
+
+    my $label =  $self->{config}{header}
+                   ? $self->{config}{header} . ' header'
+                   : $self->{config}{response_name};
+
+    return $self->{config}{on_error}->($c, "$label required") unless $response;
 
     return $c->delay(
             sub {
@@ -76,21 +88,21 @@ sub check_captcha {
             },
             sub {
                 my ($delay, $tx) = @_;
-                
+
                 if ( my $err = $tx->error ) { # network or google fault
                     $c->app->log->error(sprintf "Can't verify captcha: %s %s", $err->{code} // '', $err->{message} // '');
-                    $self->{config}{on_error}->($c, "$self->{config}{response_name} validation error");
+                    $self->{config}{on_error}->($c, "$label validation error");
                 }
                 elsif ( $tx->res->json('/success') ) { # vaidated ok
                     $self->{config}{on_success}->($c, , $tx->res->json);
                     $next->();
                 }
                 else { # failed validation
-                    my $message = "$self->{config}{response_name} invalid";                    
+                    my $message = "$label invalid";
                     my $err_codes = $tx->res->json('/error-codes');
                     if ( $err_codes and grep !/input-response/, @$err_codes ) {
                         $c->app->log->error("Can't verify captcha. Check your config: " . join ', ', @$err_codes);
-                        $message = "$self->{config}{response_name} validation error";                        
+                        $message = "$label validation error";
                     }
                     $self->{config}{on_error}->($c, $message, $tx->res->json);
                 }
@@ -103,14 +115,14 @@ sub recaptcha_script {
     my ($c, %args) = @_;
 
     my $url = Mojo::URL->new('https://www.google.com/recaptcha/api.js');
-    
+
     $url->query( { @$_ } )
         for grep $_->[1],
             map [ $_ => $args{$_} // $self->{config}{$_} ],
             qw(hl onload render);
 
     my @parts = ( 'script', qq(src="$url") );
-    
+
     push @parts, grep $args{$_} // $self->{config}{$_}, 'async', 'defer';
 
     return Mojo::ByteStream->new('<' . join( ' ', @parts ) . '></script>');
@@ -121,7 +133,7 @@ sub recaptcha_div {
     my ($c, %args) = @_;
 
     my @parts = ( 'div', 'class="g-recaptcha"' );
-    
+
     push @parts,
          map qq(data-$_->[0]="$_->[1]"),
          grep $_->[1],
@@ -242,10 +254,28 @@ Condition subroutine takes Mojolicious::Controller object as argument and
 must return true or false. True means that current route requres captcha
 protection. False means no protection required.
 
+=item disabled
+
+  reCAPTCHAv2 => {
+    ...
+    disabled => 1,
+    ...
+  },
+
+Set it true if you want to completely skip captcha validation. This can be useful
+for autotests. Environment variable C<CAPTCHA_DISABLED> has the same effect.
+
 =item response_name
 
 Name of parameter with captcha response. Defines what parameter to pass
 Google for validation. Default is C<captcha>.
+
+=item header
+
+  header => 'X-Captcha',
+
+If C<header> is set, than captcha response value expected in this header
+instead of request parameter
 
 =item timeout
 
@@ -287,7 +317,7 @@ Theese options are used for reCAPTCHA v2 widget customization on frontend.
 Helper options can be passed as arguments to helper functions, can be defined
 in in app config or can be defined as parameters on plugin registration call.
 Arguments of helper functions have highest precedence. Arguments of plugin
-registration call have lowes precedence. 
+registration call have lowes precedence.
 See L<https://developers.google.com/recaptcha/docs/display> for full
 options description.
 
