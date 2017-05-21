@@ -126,7 +126,7 @@ for autotests. Environment variable `CAPTCHA_DISABLED` has the same effect.
 - `response_name`
 
 Name of parameter with captcha response. Defines what parameter to pass
-Google for validation. Default is `captcha`.
+Google for validation. Default is `g-recaptcha-response`.
 
 - `header`
 

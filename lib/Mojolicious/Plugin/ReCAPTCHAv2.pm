@@ -9,7 +9,7 @@ use Hash::Merge::Simple 'clone_merge';
 sub register {
     my( $plugin, $app, $conf ) =  @_;
 
-    $plugin->{config} = clone_merge { response_name => 'captcha', header => '', timeout => 5 },
+    $plugin->{config} = clone_merge { response_name => 'g-recaptcha-response', header => '', timeout => 5 },
                                     $conf // {},
                                     $app->config( 'reCAPTCHAv2' ) // {};
 
@@ -268,7 +268,7 @@ for autotests. Environment variable C<CAPTCHA_DISABLED> has the same effect.
 =item response_name
 
 Name of parameter with captcha response. Defines what parameter to pass
-Google for validation. Default is C<captcha>.
+Google for validation. Default is C<g-recaptcha-response>.
 
 =item header
 
